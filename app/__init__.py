@@ -59,8 +59,9 @@ def create_app():
     from app.routes.candidate_routes import candidate_bp
 
     # Enregistrement des routes
-    app.register_blueprint(auth_bp, url_prefix="/auth")
-    app.register_blueprint(test_bp, url_prefix="/test")
-    app.register_blueprint(candidate_bp, url_prefix="/candidates")
+    # Les blueprints portent deja leur propre url_prefix dans leurs fichiers routes.
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(test_bp)
+    app.register_blueprint(candidate_bp)
 
     return app
