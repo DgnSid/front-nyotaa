@@ -8,39 +8,42 @@ class AuthService:
 
     @staticmethod
     def register(data):
+        try:
+            existing_user = CandidateAccount.query.filter_by(
+                email=data["email"]
+            ).first()
 
-        existing_user = CandidateAccount.query.filter_by(
-            email=data["email"]
-        ).first()
+            if existing_user:
+                return None, "Email already exists"
 
-        if existing_user:
-            return None, "Email already exists"
+            password_hash = bcrypt.generate_password_hash(
+                data["password"]
+            ).decode("utf-8")
 
-        password_hash = bcrypt.generate_password_hash(
-            data["password"]
-        ).decode("utf-8")
+            user = CandidateAccount(
+                email=data["email"],
+                password_hash=password_hash,
+                first_name=data["first_name"],
+                last_name=data["last_name"],
+                phone_number=data.get("phone_number")
+            )
 
-        user = CandidateAccount(
-            email=data["email"],
-            password_hash=password_hash,
-            first_name=data["first_name"],
-            last_name=data["last_name"],
-            phone_number=data.get("phone_number")
-        )
+            db.session.add(user)
+            db.session.flush()   # important pour récupérer user.id
 
-        db.session.add(user)
-        db.session.flush()   # important pour récupérer user.id
+            # création automatique du profil
+            profile = CandidateProfile(
+                candidate_account_id=user.id
+            )
 
-        # création automatique du profil
-        profile = CandidateProfile(
-            candidate_account_id=user.id
-        )
+            db.session.add(profile)
 
-        db.session.add(profile)
+            db.session.commit()
 
-        db.session.commit()
-
-        return user, None
+            return user, None
+        except Exception as e:
+            db.session.rollback()
+            return None, str(e)
 
     @staticmethod
     def login(email, password):

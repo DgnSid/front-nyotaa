@@ -24,7 +24,7 @@ def create_app():
     # CORS — autoriser le frontend React (Vite sur 5173 et production)
     CORS(
         app,
-        origins=["http://localhost:5173", "http://localhost:3000", "https://votre-frontend.vercel.app"],  # Remplacez par l'URL Vercel
+        origins=["http://localhost:5173", "http://localhost:3000", "https://nyota-front-fin-master.vercel.app", "https://www.nyota.co", "https://nyota.co"],  # Remplacez par l'URL Vercel
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization"],
         supports_credentials=True,
