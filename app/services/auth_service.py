@@ -9,8 +9,21 @@ class AuthService:
     @staticmethod
     def register(data):
         try:
+            if not data:
+                return None, "Request body is required"
+
+            required_fields = ["email", "password", "first_name", "last_name"]
+            missing = [
+                field for field in required_fields
+                if not str(data.get(field, "")).strip()
+            ]
+            if missing:
+                return None, f"Missing required fields: {', '.join(missing)}"
+
+            email = data["email"].strip().lower()
+
             existing_user = CandidateAccount.query.filter_by(
-                email=data["email"]
+                email=email
             ).first()
 
             if existing_user:
@@ -21,7 +34,7 @@ class AuthService:
             ).decode("utf-8")
 
             user = CandidateAccount(
-                email=data["email"],
+                email=email,
                 password_hash=password_hash,
                 first_name=data["first_name"],
                 last_name=data["last_name"],
@@ -31,9 +44,15 @@ class AuthService:
             db.session.add(user)
             db.session.flush()   # important pour récupérer user.id
 
+            valid_genders = {"Homme", "Femme", "Autre"}
+            gender = data.get("gender")
+            if gender not in valid_genders:
+                gender = None
+
             # création automatique du profil
             profile = CandidateProfile(
-                candidate_account_id=user.id
+                candidate_account_id=user.id,
+                gender=gender
             )
 
             db.session.add(profile)
