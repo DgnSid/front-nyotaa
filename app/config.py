@@ -1,5 +1,9 @@
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 def _normalize_db_url(raw_url):
