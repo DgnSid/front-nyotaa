@@ -7,12 +7,27 @@ from flask_jwt_extended import JWTManager
 from datetime import timedelta
 from app.config import Config
 from app.extensions import db, mail, bcrypt, migrate
+from urllib.parse import urlsplit
 
 def create_app():
     app = Flask(__name__)
 
     # Chargement de la configuration
     app.config.from_object(Config)
+
+    # Log diagnostic DB (sans informations sensibles)
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    db_opts = app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {}) or {}
+    parsed = urlsplit(db_uri) if db_uri else None
+    connect_args = db_opts.get("connect_args", {})
+    ssl_enabled = isinstance(connect_args, dict) and "ssl" in connect_args
+    print(
+        "[DB_CONFIG] "
+        f"scheme={parsed.scheme if parsed else 'none'} "
+        f"host={parsed.hostname if parsed else 'none'} "
+        f"has_ssl_mode_in_uri={'ssl-mode' in db_uri.lower()} "
+        f"ssl_connect_args={ssl_enabled}"
+    )
 
     # Configuration JWT (sécurité)
     app.config["JWT_TOKEN_LOCATION"] = ["headers"]
