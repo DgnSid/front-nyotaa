@@ -1,5 +1,3 @@
-import os
-from werkzeug.utils import secure_filename
 from app.models.candidate_document import CandidateDocument
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -11,9 +9,60 @@ from app.models.candidate_experience import CandidateExperience
 from app.models.candidate_skill import CandidateSkill
 from app.models.personality_profile import PersonalityProfile
 from app.extensions import db
-from app.models.test_session import TestSession
+from app.services.cloudinary_service import CloudinaryService
 
 candidate_bp = Blueprint("candidate", __name__, url_prefix="/candidates")
+
+CV_ALLOWED_EXTENSIONS = {"pdf"}
+DOC_ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "jpg", "jpeg", "png"}
+
+
+def _extension(filename):
+    if not filename or "." not in filename:
+        return ""
+    return filename.rsplit(".", 1)[1].lower()
+
+
+def _upload_candidate_file(user_id, file, document_type, allowed_extensions, cloudinary_folder):
+    if not file:
+        return None, (jsonify({"error": "Aucun fichier"}), 400)
+
+    ext = _extension(file.filename)
+    if ext not in allowed_extensions:
+        return None, (jsonify({"error": "Format de fichier non autorisé"}), 400)
+
+    profile = CandidateProfile.query.filter_by(
+        candidate_account_id=user_id
+    ).first()
+    if not profile:
+        return None, (jsonify({"error": "Profile not found"}), 404)
+
+    try:
+        upload_result = CloudinaryService.upload_raw(file, cloudinary_folder)
+    except Exception as exc:
+        return None, (jsonify({"error": f"Upload Cloudinary échoué: {str(exc)}"}), 502)
+
+    old_docs = CandidateDocument.query.filter_by(
+        candidate_profile_id=profile.id,
+        document_type=document_type,
+        is_active=True
+    ).all()
+    for doc in old_docs:
+        doc.is_active = False
+
+    document = CandidateDocument(
+        candidate_profile_id=profile.id,
+        document_type=document_type,
+        file_name=file.filename,
+        storage_path=upload_result.get("secure_url"),
+        mime_type=file.mimetype,
+        file_size_bytes=upload_result.get("bytes"),
+        is_active=True
+    )
+    db.session.add(document)
+    db.session.commit()
+
+    return document, None
 
 
 @candidate_bp.route("/profile", methods=["GET"])
@@ -238,51 +287,44 @@ def update_experiences():
 def upload_cv():
 
     user_id = get_jwt_identity()
-
     file = request.files.get("cv")
 
-    if not file:
-        return jsonify({"error": "Aucun fichier"}), 400
-
-    profile = CandidateProfile.query.filter_by(
-        candidate_account_id=user_id
-    ).first()
-
-    filename = secure_filename(file.filename)
-
-    upload_folder = "uploads/cv"
-
-    os.makedirs(upload_folder, exist_ok=True)
-
-    file_path = os.path.join(upload_folder, filename)
-
-    file.save(file_path)
-
-    # désactiver l'ancien CV
-    old_docs = CandidateDocument.query.filter_by(
-        candidate_profile_id=profile.id,
+    document, error_response = _upload_candidate_file(
+        user_id=user_id,
+        file=file,
         document_type="CV",
-        is_active=True
-    ).all()
-
-    for doc in old_docs:
-        doc.is_active = False
-
-    document = CandidateDocument(
-        candidate_profile_id=profile.id,
-        document_type="CV",
-        file_name=filename,
-        storage_path=file_path,
-        mime_type=file.mimetype,
-        file_size_bytes=os.path.getsize(file_path),
-        is_active=True
+        allowed_extensions=CV_ALLOWED_EXTENSIONS,
+        cloudinary_folder="nyota/cv",
     )
+    if error_response:
+        return error_response
 
-    db.session.add(document)
+    return jsonify({
+        "message": "CV uploadé avec succès",
+        "storage_path": document.storage_path
+    })
 
-    db.session.commit()
 
-    return jsonify({"message": "CV uploadé avec succès"})
+@candidate_bp.route("/documents/upload-document", methods=["POST"])
+@jwt_required()
+def upload_document():
+    user_id = get_jwt_identity()
+    file = request.files.get("document")
+
+    document, error_response = _upload_candidate_file(
+        user_id=user_id,
+        file=file,
+        document_type="DOCUMENT",
+        allowed_extensions=DOC_ALLOWED_EXTENSIONS,
+        cloudinary_folder="nyota/documents",
+    )
+    if error_response:
+        return error_response
+
+    return jsonify({
+        "message": "Document uploadé avec succès",
+        "storage_path": document.storage_path
+    })
 
 @candidate_bp.route("/cv", methods=["GET"])
 @jwt_required()
@@ -425,4 +467,3 @@ def update_preferences():
     db.session.commit()
 
     return jsonify({"message": "Préférences mises à jour"})
-
