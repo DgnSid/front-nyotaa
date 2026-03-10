@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from app.services.auth_service import AuthService
 from app.models.candidate_account import CandidateAccount
@@ -55,7 +55,8 @@ def forgot_password():
     if not user:
         return {"message": "User not found"}, 404
     token = generate_reset_token(email)
-    reset_url = f"http://localhost:3000/reset-password/{token}"
+    frontend_url = current_app.config.get("FRONTEND_URL", "http://localhost:3000")
+    reset_url = f"{frontend_url}/reset-password/{token}"
     msg = Message(
         "Réinitialisation du mot de passe",
         recipients=[email]
