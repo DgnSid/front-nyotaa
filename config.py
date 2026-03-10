@@ -29,3 +29,6 @@ class Config:
 
     # Types fichiers autorisés
     ALLOWED_EXTENSIONS = {"pdf", "doc", "docx"}
+
+    # URL du frontend (pour liens envoyés par email)
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
